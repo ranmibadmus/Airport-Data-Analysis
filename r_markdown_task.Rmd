@@ -1,0 +1,251 @@
+---
+title: "Vephla Data Tasks"
+author: "Oluwaferanmi Badmus"
+date: "2023-08-11"
+output: html_document
+---
+
+
+```{r}
+#Load the required packages
+library(tidyverse)
+library(readr)
+library(dplyr)
+```
+
+```{r}
+#Load in dataset
+#set getwd
+setwd("C:/Users/PC/Documents/DATASETS_R")
+```
+
+```{r}
+#bring in data 
+d1 <- read_csv("2007.csv")
+d2 <- read_csv("2008.csv")
+```
+
+```{r}
+#Combine datasets d1 and d2
+cd <- rbind.data.frame(d1,d2)
+
+View(cd)
+```
+
+```{r}
+#check the dataset to see the type of data
+str(cd)
+```
+
+```{r}
+#TASK: FInd the best time of the week, month and days to travel and avoi delay
+#Select columns of interest - which is also subsetting.
+working_data <- cd %>%
+  select(1,2,3,4,5,7,ArrDelay,DepDelay)
+
+View(working_data)
+```
+
+
+```{r}
+#Cleaning Empty cells in dataset
+#Filter to see columns that contain empty cells
+
+working_data_na <- colnames(working_data) [apply(working_data,2,anyNA)]
+
+working_data_na
+```
+
+
+```{r}
+#Finding the mean of columns with NAs (Not AVailables)
+
+mean_na <- apply(working_data [ ,colnames(working_data) %in% working_data_na],
+                 2, mean,
+                 na.rm = TRUE)
+
+mean_na
+```
+
+```{r}
+#Replacing Missing Values with the mean values
+
+working_data_wr <- working_data %>%
+  mutate(DepTime_withoutNA = ifelse(is.na (DepTime), 
+                                    mean_na[1], DepTime),
+         
+         ArrTime_withoutNA = ifelse(is.na(ArrTime),
+                                    mean_na[2], ArrTime),
+         
+         ArrDelay_withoutNA = ifelse(is.na(ArrDelay),
+                                     mean_na[3], ArrDelay),
+         
+         DepDelay_withoutNA = ifelse(is.na(DepDelay),
+                                     mean_na[4], DepDelay))
+
+View(working_data_wr)
+```
+
+
+```{r}
+#omitting empty cells from working data
+#place in a variable
+
+omitted_working_data <- working_data %>%
+  na.omit ( )
+
+View(omitted_working_data)
+```
+
+
+```{r}
+#Modify data so that 1's and 2's will reflect correct values
+#Find the best time of the year to travel.
+#Find the best month of the year to travel.
+
+new_omitted_data <- omitted_working_data %>%
+  mutate(MM = case_when(Month == 1 ~ "Jan",
+                        Month == 2 ~ "Feb",
+                        Month == 3 ~ "Mar",
+                        Month == 4 ~ "Apr",
+                        Month == 5 ~ "May",
+                        Month == 6 ~ "Jun",
+                        Month == 7 ~ "Jul",
+                        Month == 8 ~ "Aug",
+                        Month == 9 ~ "Sep",
+                        Month == 10 ~ "Oct",
+                        Month == 11 ~ "Nov",
+                        Month == 12 ~ "Dec",)) %>%
+  
+  mutate (week_day = case_when(DayOfWeek == 1 ~ "Sun",
+                               DayOfWeek == 2 ~ "Mon",
+                               DayOfWeek == 3 ~ "Tue",
+                               DayOfWeek == 4 ~ "Wed",
+                               DayOfWeek == 5 ~ "Thu",
+                               DayOfWeek == 6 ~ "Fri",
+                               DayOfWeek == 7 ~ "Sat",)) %>%
+  
+  mutate (Departure_hour = case_when(DepTime < 1200 ~ "AM",
+                                     DepTime > 1200 ~ "PM",)) %>%
+  
+  mutate (Arrival_hour = case_when(ArrTime < 1200 ~ "AM",
+                                   ArrTime > 1200 ~ "PM"))
+
+View(new_omitted_data)
+```
+
+
+```{r}
+#Finding the average/mean of all delays
+
+delays <- new_omitted_data %>%
+  mutate(average_delay_time = (ArrDelay + DepDelay)/ 2)
+
+View(delays)
+```
+
+
+```{r}
+#Best Time of the month to travel
+
+best_month <- delays %>%
+  summarise(sum(average_delay_time), prop_of_delay = n()/nrow(delays))
+
+best_month
+```
+
+```{r}
+#best time of the month to travel:
+
+best_month <- delays %>%
+  group_by(MM) %>%
+  
+  summarise(average_delay_time = sum(average_delay_time), prop_of_delay = n()/nrow(delays))
+
+View(best_month)
+```
+
+```{r}
+#best month to travel is:
+best_month[which.min(best_month$average_delay_time), ]
+```
+
+```{r}
+#Best day of the week to travel
+
+best_day <- delays %>%
+  group_by(week_day)%>%
+  
+  summarise(average_delay_time = sum(average_delay_time), prop_of_delay = n()/nrow(delays))
+
+View(best_day)
+```
+
+```{r}
+#best day of week to travel is:
+best_day[which.min(best_day$average_delay_time), ]
+```
+
+
+```{r}
+#R TASK: FIND THE BEST TIME OF THE DAY TO TRAVEL (AM OR PM):
+
+#Clear empty cells from data
+task_data = delays %>%
+  na.omit ( )
+
+best_time_day <-task_data %>%
+  group_by(Departure_hour) %>%
+  
+  summarise(average_delay_time = sum(average_delay_time), prop_of_delay = n()/nrow(task_data))
+
+View(best_time_day)
+
+#best hour of day to travel is:
+best_time_day[which.min(best_time_day$average_delay_time), ]
+
+#ANSWER: IT IS BEST TO TRAVEL IN THE MORINNG HOUR BEFORE MID-DAY
+```
+
+#ANSWER: IT IS BEST TO TRAVEL IN THE MORINNG HOUR BEFORE MID-DAY
+
+
+```{r}
+#plot the best time of the month to travel
+#Adding the geom bar
+#Adding colours/Fill
+#Using the Reorder Function
+
+ggplot(best_month, aes (x=reorder(MM,prop_of_delay), y=prop_of_delay, fill=MM)) + geom_bar(stat = "identity")
+
+```
+
+
+```{r}
+#Plot the best time of the week on a point graph.
+
+ggplot(best_day, aes(x=week_day, y=prop_of_delay, shape=week_day)) + geom_point()
+
+```
+
+
+```{r}
+#plot best day to travel on bar chart
+
+ggplot(best_day, aes (x=reorder(week_day,prop_of_delay), y=prop_of_delay, fill=week_day)) + geom_bar(stat = "identity")
+```
+
+
+```{r}
+# YLIMIT IN R (best month to travel)
+
+ggplot(best_month, aes(x=MM, y=prop_of_delay, fill=MM)) + geom_point() + ylim(0.06,0.065)
+```
+
+
+```{r}
+#TASK 1 - Plot the best hour of the week to travel on a point graph.
+
+ggplot(best_time_day, aes(x=Departure_hour, y=prop_of_delay, shape=Departure_hour)) + geom_point()
+```
+
